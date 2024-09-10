@@ -12,12 +12,6 @@ help:
 	@echo "## metabase			- Spinup metabase instance."
 	@echo "## clean			- Cleanup all running containers related to the challenge."
 
-docker-build-slim:
-	@chmod 777 logs/
-	@chmod 777 notebooks/
-	@docker network inspect dataeng-network >/dev/null 2>&1 || docker network create dataeng-network
-	@docker build -t dataeng-dibimbing/jupyter -f ./docker/Dockerfile.jupyter .
-
 docker-build:
 	@echo '__________________________________________________________'
 	@echo 'Building Docker Images ...'
@@ -44,17 +38,6 @@ docker-build-arm:
 	@docker build -t dataeng-dibimbing/airflow -f ./docker/Dockerfile.airflow-arm .
 	@echo '__________________________________________________________'
 	@docker build -t dataeng-dibimbing/jupyter -f ./docker/Dockerfile.jupyter .
-	@echo '==========================================================='
-
-jupyter:
-	@echo '__________________________________________________________'
-	@echo 'Creating Jupyter Notebook Cluster at http://localhost:${JUPYTER_PORT} ...'
-	@echo '__________________________________________________________'
-	@docker compose -f ./docker/docker-compose-jupyter.yml --env-file .env up -d
-	@echo 'Created...'
-	@echo 'Processing token...'
-	@sleep 20
-	@docker logs ${JUPYTER_CONTAINER_NAME} 2>&1 | grep '\?token\=' -m 1 | cut -d '=' -f2
 	@echo '==========================================================='
 
 spark:
@@ -120,32 +103,6 @@ postgres-create-warehouse:
 	@docker exec -it ${POSTGRES_CONTAINER_NAME} psql -U ${POSTGRES_USER} -d ${POSTGRES_DB} -f sql/warehouse-ddl.sql
 	@echo '==========================================================='
 
-kafka: kafka-create
-
-kafka-create:
-	@echo '__________________________________________________________'
-	@echo 'Creating Kafka Cluster ...'
-	@echo '__________________________________________________________'
-	@docker compose -f ./docker/docker-compose-kafka.yml --env-file .env up -d
-	@echo 'Waiting for uptime on http://localhost:8083 ...'
-	@sleep 20
-	@echo '==========================================================='
-
-kafka-create-test-topic:
-	@docker exec ${KAFKA_CONTAINER_NAME} \
-		kafka-topics.sh --create \
-		--partitions 3 \
-		--replication-factor ${KAFKA_REPLICATION} \
-		--bootstrap-server localhost:9092 \
-		--topic ${KAFKA_TOPIC_NAME}
-
-kafka-create-topic:
-	@docker exec ${KAFKA_CONTAINER_NAME} \
-		kafka-topics.sh --create \
-		--partitions ${partition} \
-		--replication-factor ${KAFKA_REPLICATION} \
-		--bootstrap-server localhost:9092 \
-		--topic ${topic}
 
 spark-produce:
 	@echo '__________________________________________________________'
@@ -162,27 +119,6 @@ spark-consume:
 	@docker exec ${SPARK_WORKER_CONTAINER_NAME}-1 \
 		spark-submit \
 		/spark-scripts/spark-event-consumer.py
-
-datahub-create:
-	@echo '__________________________________________________________'
-	@echo 'Creating Datahub Instance ...'
-	@echo '__________________________________________________________'
-	@docker compose -f ./docker/docker-compose-datahub.yml --env-file .env up
-	@echo '==========================================================='
-
-datahub-ingest:
-	@echo '__________________________________________________________'
-	@echo 'Ingesting Data to Datahub ...'
-	@echo '__________________________________________________________'
-	@datahub ingest -c ./datahub/sample.yaml --dry-run
-	@echo '==========================================================='
-
-metabase: postgres-create-warehouse
-	@echo '__________________________________________________________'
-	@echo 'Creating Metabase Instance ...'
-	@echo '__________________________________________________________'
-	@docker compose -f ./docker/docker-compose-metabase.yml --env-file .env up
-	@echo '==========================================================='
 
 clean:
 	@bash ./scripts/goodnight.sh
